@@ -11,9 +11,11 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QTimer, QItemSelectionModel
 from PySide6.QtGui import QColor, QBrush, QFont, QFontMetrics, QPixmap
 
+from mewgenics.models.breeding_cache import resolve_pair_coi
+
 from save_parser import (
     Cat, STAT_NAMES,
-    can_breed, risk_percent, kinship_coi,
+    can_breed,
     get_parents, get_grandparents, find_common_ancestors,
     _appearance_group_names, _appearance_preview_text,
     _inheritance_candidates,
@@ -1075,7 +1077,7 @@ class CatDetailPanel(QWidget):
         inh.addLayout(compat_row)
 
         # ── Risk breakdown ──
-        coi = kinship_coi(a, b)
+        coi = resolve_pair_coi(a, b)
         disorder_ch, part_defect_ch, combined_ch = _malady_breakdown(coi)
         risk_row = QHBoxLayout()
         risk_row.setSpacing(8)

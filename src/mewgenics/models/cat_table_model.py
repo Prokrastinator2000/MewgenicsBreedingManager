@@ -12,9 +12,11 @@ from PySide6.QtGui import (
     QColor, QBrush, QPalette, QPainter, QIcon, QPixmap, QFont,
 )
 
+from mewgenics.models.breeding_cache import resolve_pair_risk
+
 from save_parser import (
     Cat, STAT_NAMES,
-    can_breed, risk_percent,
+    can_breed,
     get_all_ancestors, get_parents, find_common_ancestors,
     _is_hater_pair, _kinship,
 )
@@ -813,7 +815,9 @@ class CatTableModel(QAbstractTableModel):
         if bc is not None and bc.ready:
             pct = bc.get_risk(self._focus_cat, cat)
         else:
-            pct = risk_percent(self._focus_cat, cat)
+            # No view-local cache yet (still building): fall back to the
+            # process-wide active cache before doing a live pedigree walk.
+            pct = resolve_pair_risk(self._focus_cat, cat)
         self._relation_cache[key] = pct
         return pct
 

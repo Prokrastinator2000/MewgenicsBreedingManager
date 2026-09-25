@@ -13,8 +13,10 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QByteArray, QSize, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QIcon
 
+from mewgenics.models.breeding_cache import resolve_pair_coi
+
 from save_parser import (
-    Cat, STAT_NAMES, kinship_coi, get_parents,
+    Cat, STAT_NAMES, get_parents,
     shared_ancestor_counts,
 )
 from breeding import (
@@ -3057,7 +3059,7 @@ class PerfectCatPlannerView(QWidget):
                 "known_offspring": tracked_offspring(cat_a, cat_b),
                 "projection": pair["projection"],
                 "risk": pair["risk"],
-                "coi": kinship_coi(cat_a, cat_b),
+                "coi": resolve_pair_coi(cat_a, cat_b),
                 "shared": shared_ancestor_counts(cat_a, cat_b, recent_depth=3, max_depth=8),
                 "source": pair.get("source", "suggested"),
                 "slot_index": pair.get("slot_index"),

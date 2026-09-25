@@ -1,4 +1,5 @@
 """Room Optimizer views extracted from mewgenics_manager.py."""
+from __future__ import annotations
 
 import html
 from typing import Optional

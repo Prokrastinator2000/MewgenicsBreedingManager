@@ -920,7 +920,11 @@ class SafeBreedingView(QWidget):
                 trait_values = {
                     "aggression": (getattr(cat, "aggression", 0.0) + getattr(other, "aggression", 0.0)) / 2.0,
                     "libido": (getattr(cat, "libido", 0.0) + getattr(other, "libido", 0.0)) / 2.0,
-                    "inbredness": kinship_coi(cat, other),
+                    "inbredness": (
+                        cache.get_coi(cat, other)
+                        if cache is not None and cache.ready
+                        else kinship_coi(cat, other)
+                    ),
                 }
                 stim = self._pair_stimulation()
                 active_candidates, _, _ = _inheritance_candidates(

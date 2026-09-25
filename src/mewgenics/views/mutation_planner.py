@@ -1,4 +1,5 @@
 """Mutation & Disorder Breeding Planner view and helper functions."""
+from __future__ import annotations
 
 import re
 from collections import Counter
@@ -14,8 +15,10 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QColor
 
+from mewgenics.models.breeding_cache import resolve_pair_risk, resolve_pair_coi
+
 from save_parser import (
-    Cat, STAT_NAMES, can_breed, risk_percent, kinship_coi,
+    Cat, STAT_NAMES, can_breed,
     _stimulation_inheritance_weight, _inheritance_candidates,
     _malady_breakdown,
 )
@@ -1586,7 +1589,7 @@ class MutationDisorderPlannerView(QWidget):
                     else:
                         uncovered.append(t)
             if covered:  # only show pairs that cover at least one positive trait
-                pair_risk = risk_percent(a, b)
+                pair_risk = resolve_pair_risk(a, b)
                 scored_pairs.append((score, a, b, covered, uncovered, penalized, pair_risk))
 
         scored_pairs.sort(key=lambda x: (-x[0], x[6]))  # best score, lowest birth-defect risk
@@ -2004,7 +2007,7 @@ class MutationDisorderPlannerView(QWidget):
             for f in females:
                 if m is f:
                     continue
-                pair_risk = risk_percent(m, f)
+                pair_risk = resolve_pair_risk(m, f)
                 note = _tr("mutation_planner.single_trait.note.both_carriers")
                 if pair_risk >= 20:
                     note += f" (birth defect risk {int(round(pair_risk))}%)"
@@ -2051,7 +2054,7 @@ class MutationDisorderPlannerView(QWidget):
                 pair_table.setItem(row, 0, QTableWidgetItem(ca.name))
                 pair_table.setItem(row, 1, QTableWidgetItem(cb.name))
                 pair_table.setItem(row, 2, QTableWidgetItem(note))
-                pair_risk = risk_percent(ca, cb)
+                pair_risk = resolve_pair_risk(ca, cb)
                 risk_pct = int(round(pair_risk))
                 inbred_item = QTableWidgetItem(f"{risk_pct}%")
                 inbred_item.setTextAlignment(Qt.AlignCenter)
@@ -2302,7 +2305,7 @@ class MutationDisorderPlannerView(QWidget):
             layout.addWidget(self._info_label(_tr("mutation_planner.pair.no_disorders")))
 
         # Birth defect risk breakdown
-        coi = kinship_coi(cat_a, cat_b)
+        coi = resolve_pair_coi(cat_a, cat_b)
         disorder_ch, part_defect_ch, combined_ch = _malady_breakdown(coi)
         inbred_note = ""
         if cat_a.inbredness is None and cat_b.inbredness is None:

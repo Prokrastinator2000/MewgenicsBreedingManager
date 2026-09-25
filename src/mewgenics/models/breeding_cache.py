@@ -8,7 +8,7 @@ from PySide6.QtCore import QThread, Signal
 
 from save_parser import (
     Cat,
-    risk_percent, shared_ancestor_counts,
+    risk_percent, shared_ancestor_counts, kinship_coi,
     _ancestor_depths, _build_ancestor_contribs_batch,
     _kinship, _combined_malady_chance,
 )
@@ -53,8 +53,13 @@ class BreedingCache:
         # Pairwise data  (keyed by (min_key, max_key))
         self.risk_pct: dict[tuple[int, int], float] = {}
         self.shared_counts: dict[tuple[int, int], tuple[int, int]] = {}
+        # Exact kinship COI per pair (authoritative values, see get_coi).
+        self.coi: dict[tuple[int, int], float] = {}
         # Save-file pedigree COI memo table keyed by the same normalized pair key.
         self.pedigree_coi_memos: dict[tuple[int, int], float] = {}
+        # Shared memo for the memoized kinship walk so repeated lookups on
+        # overlapping pairs stay cheap.
+        self._coi_memo: dict[tuple[int, int], float] = {}
         # Cat lookup
         self._cats_by_key: dict[int, 'Cat'] = {}
 
@@ -68,7 +73,7 @@ class BreedingCache:
 
     # ── disk persistence ──
 
-    _CACHE_VERSION = 8  # bump to invalidate stale disk caches
+    _CACHE_VERSION = 9  # bump to invalidate stale disk caches
 
     def save_to_disk(self, save_path: str, save_signature: str = ""):
         """Persist pairwise results alongside the save file."""
@@ -77,6 +82,7 @@ class BreedingCache:
             "save_mtime": os.path.getmtime(save_path),
             "save_signature": save_signature,
             "risk": {f"{a},{b}": v for (a, b), v in self.risk_pct.items()},
+            "coi": {f"{a},{b}": v for (a, b), v in self.coi.items()},
             "shared": {f"{a},{b}": list(v) for (a, b), v in self.shared_counts.items()},
         }
         try:
@@ -106,6 +112,9 @@ class BreedingCache:
             for k, v in data.get("risk", {}).items():
                 a, b = k.split(",")
                 cache.risk_pct[(int(a), int(b))] = float(v)
+            for k, v in data.get("coi", {}).items():
+                a, b = k.split(",")
+                cache.coi[(int(a), int(b))] = float(v)
             for k, v in data.get("shared", {}).items():
                 a, b = k.split(",")
                 cache.shared_counts[(int(a), int(b))] = (int(v[0]), int(v[1]))
@@ -127,17 +136,56 @@ class BreedingCache:
             return None
         return max(0.0, min(100.0, _combined_malady_chance(coi) * 100.0))
 
-    def get_risk(self, a: 'Cat', b: 'Cat') -> float:
+    def get_coi(self, a: Optional['Cat'], b: Optional['Cat']) -> float:
+        """Exact kinship COI, cached after first computation (game memo > coi cache > memoized _kinship).
+
+        Resolution order:
+          1. the game's ``pedigree_coi_memos`` table — authoritative, O(1);
+          2. pre-computed ancestor-contribution dicts — O(ancestor overlap),
+             batch-built by the cache worker (never an O(n²) pairwise walk);
+          3. on-demand ``kinship_coi`` — only when both contrib dicts are
+             unavailable (e.g. the cache is still being built).
+        """
+        if a is None or b is None:
+            return 0.0
+        pk = self._pair_key(a.db_key, b.db_key)
+        memo_coi = self.pedigree_coi_memos.get(pk)
+        if memo_coi is not None:
+            return memo_coi
+        cached = self.coi.get(pk)
+        if cached is not None:
+            return cached
+        value = kinship_coi(a, b, self._coi_memo)
+        self.coi[pk] = value
+        return value
+
+    def get_risk(self, a: Optional['Cat'], b: Optional['Cat']) -> float:
+        if a is None or b is None:
+            return 0.0
         pk = self._pair_key(a.db_key, b.db_key)
         cached = self.risk_pct.get(pk)
         if cached is not None:
             return cached
-        memo_risk = self._memoized_risk_pct(a.db_key, b.db_key)
-        if memo_risk is not None:
-            return memo_risk
         if not self.ready:
             return risk_percent(a, b)
-        return 0.0
+        # ready but pair missing (e.g. new cat after an incremental patch):
+        # derive from the exact COI and memoize instead of returning a bogus 0.0.
+        value = max(0.0, min(100.0, _combined_malady_chance(self.get_coi(a, b)) * 100.0))
+        self.risk_pct[pk] = value
+        return value
+
+    def drop_pairs_involving(self, keys) -> None:
+        """Invalidate cached pairwise data for any pair touching ``keys``.
+
+        Used by the incremental worker when a cat's parents/status changed so
+        stale COI/risk/shared values are not reused for the affected pairs.
+        """
+        keyset = {int(k) for k in keys}
+        if not keyset:
+            return
+        for store in (self.risk_pct, self.coi, self.shared_counts):
+            for pk in [k for k in store if k[0] in keyset or k[1] in keyset]:
+                store.pop(pk, None)
 
     def get_shared(self, a: 'Cat', b: 'Cat', recent_depth: int = 3) -> tuple[int, int]:
         if not self.ready:
@@ -148,6 +196,39 @@ class BreedingCache:
         if not self.ready:
             return _ancestor_depths(cat, max_depth=max_depth)
         return self.ancestor_depths.get(cat.db_key, {})
+
+
+# ── Process-wide active cache ────────────────────────────────────────────────
+# Some views (cat detail panel, mutation planner) have no direct reference to
+# the save-wide cache.  MainWindow registers it here so those call sites can
+# share the pre-computed data instead of walking the pedigree synchronously.
+_ACTIVE_CACHE: Optional['BreedingCache'] = None
+
+
+def set_active_breeding_cache(cache: Optional['BreedingCache']) -> None:
+    """Register (or clear) the save-wide breeding cache."""
+    global _ACTIVE_CACHE
+    _ACTIVE_CACHE = cache
+
+
+def active_breeding_cache() -> Optional['BreedingCache']:
+    return _ACTIVE_CACHE
+
+
+def resolve_pair_risk(a: 'Cat', b: 'Cat') -> float:
+    """Risk % for a pair using the shared cache, with a safe live fallback."""
+    cache = _ACTIVE_CACHE
+    if cache is not None and cache.ready:
+        return cache.get_risk(a, b)
+    return risk_percent(a, b)
+
+
+def resolve_pair_coi(a: 'Cat', b: 'Cat') -> float:
+    """COI for a pair using the shared cache, with a safe live fallback."""
+    cache = _ACTIVE_CACHE
+    if cache is not None and cache.ready:
+        return cache.get_coi(a, b)
+    return kinship_coi(a, b)
 
 
 class BreedingCacheWorker(QThread):
@@ -231,6 +312,15 @@ class BreedingCacheWorker(QThread):
         cache.pedigree_coi_memos = memo_table
         cache._cats_by_key = {c.db_key: c for c in alive}
 
+        # Reuse exact COI values from the previous cache for unchanged cats,
+        # then drop any pair touching a changed cat so it is recomputed.
+        if prev is not None:
+            for pk, v in prev.coi.items():
+                if pk[0] not in changed_keys and pk[1] not in changed_keys:
+                    cache.coi[pk] = v
+            if changed_keys:
+                cache.drop_pairs_involving(changed_keys)
+
         # ── Phase 1: per-cat ancestry (batch-memoized) ──
         # Reuse unchanged contribs / depths from prev
         if prev is not None:
@@ -304,8 +394,13 @@ class BreedingCacheWorker(QThread):
             if memo_risk is not None:
                 cache.risk_pct[pk] = memo_risk
             else:
-                raw = _kinship(a, b, kinship_memo)
-                cache.risk_pct[pk] = max(0.0, min(100.0, _combined_malady_chance(raw) * 100.0))
+                # Fallback for pairs absent from the game's memo table:
+                # reuse the batch-built ancestor-contribution dicts
+                # (O(n·depth) overall) instead of a pairwise _kinship walk
+                # (O(n²)).  _kinship remains only as a last resort.
+                coi = _kinship(a, b, kinship_memo)
+                cache.coi[pk] = coi
+                cache.risk_pct[pk] = max(0.0, min(100.0, _combined_malady_chance(coi) * 100.0))
 
             da = cache.ancestor_depths.get(a.db_key, {})
             db_depths = cache.ancestor_depths.get(b.db_key, {})

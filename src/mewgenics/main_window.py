@@ -101,6 +101,7 @@ from mewgenics.utils.styling import (
 from mewgenics.models.breeding_cache import (
     BreedingCache, BreedingCacheWorker,
     _breeding_cache_fingerprint, _breeding_save_signature,
+    set_active_breeding_cache,
 )
 from mewgenics.models.cat_table_model import (
     TagStripDelegate, CatTableModel, VisualIconDelegate,
@@ -3535,6 +3536,7 @@ class MainWindow(QMainWindow):
         }
 
         self._breeding_cache = None
+        set_active_breeding_cache(None)
         self._cache_progress.setValue(0)
         self._cache_progress.show()
 
@@ -3604,6 +3606,7 @@ class MainWindow(QMainWindow):
         if source_worker is not None and source_worker is not self._cache_worker:
             return
         self._breeding_cache = cache
+        set_active_breeding_cache(cache)
         self._source_model.set_breeding_cache(cache)
         if self._safe_breeding_view is not None:
             self._safe_breeding_view.set_cache(cache)
@@ -3617,6 +3620,7 @@ class MainWindow(QMainWindow):
         if source_worker is not None and source_worker is not self._cache_worker:
             return  # superseded — drop stale result
         self._breeding_cache = cache
+        set_active_breeding_cache(cache)
         self._cache_worker = None
         self._cache_progress.hide()
         # Push completed cache (now includes pairwise risk) to all views
@@ -3702,6 +3706,7 @@ class MainWindow(QMainWindow):
             fresh_save = os.path.normcase(os.path.abspath(previous_save)) != os.path.normcase(os.path.abspath(path))
         if fresh_save:
             self._breeding_cache = None
+            set_active_breeding_cache(None)
             self._prev_parent_keys = {}
         self._current_save = path
         _set_last_save(path)
@@ -3805,6 +3810,7 @@ class MainWindow(QMainWindow):
                 )
                 if summary.room in self._available_house_rooms or not summary.room
             }
+            set_active_breeding_cache(None)
             self._source_model.set_breeding_cache(None)
             if self._safe_breeding_view is not None:
                 self._safe_breeding_view.set_cache(None)

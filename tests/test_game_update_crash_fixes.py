@@ -220,6 +220,31 @@ class TestSaveLoadWorkerFailedSignal:
 
 
 class TestSaveLoadFailureRetryPolicy:
+    @pytest.fixture(autouse=True)
+    def _stub_startup_signal(self):
+        """``_on_save_load_failed`` emits ``startup_save_load_finished``.
+
+        The bare window below is built with ``__new__`` (no shiboken/C++
+        instance), so the real signal's ``emit()`` raises
+        ``RuntimeError: Signal source has been deleted``.  Swap the class
+        signal for a harmless stub for the duration of each test, restoring
+        the original descriptor exactly afterwards so later tests that build
+        a real ``MainWindow`` are unaffected.
+        """
+        cls = main_window_module.MainWindow
+        original = cls.__dict__.get("startup_save_load_finished")
+        cls.startup_save_load_finished = SimpleNamespace(emit=lambda *a, **k: None)
+        try:
+            yield
+        finally:
+            if original is None:
+                try:
+                    delattr(cls, "startup_save_load_finished")
+                except AttributeError:
+                    pass
+            else:
+                cls.startup_save_load_finished = original
+
     def _bare_window(self):
         window = main_window_module.MainWindow.__new__(main_window_module.MainWindow)
         window._save_load_worker = None

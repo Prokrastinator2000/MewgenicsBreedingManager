@@ -1,0 +1,114 @@
+{
+  "mutation_planner_state": {
+    "last_mode": "none",
+    "mode_profiles": {
+      "best_pairs": {
+        "stat_priority": [
+          "STR",
+          "DEX",
+          "CON",
+          "INT",
+          "SPD",
+          "CHA",
+          "LCK"
+        ],
+        "traits": []
+      },
+      "magic": {
+        "stat_priority": [
+          "INT",
+          "CHA",
+          "DEX",
+          "SPD",
+          "LCK",
+          "CON",
+          "STR"
+        ],
+        "traits": []
+      },
+      "melee": {
+        "stat_priority": [
+          "STR",
+          "CON",
+          "SPD",
+          "DEX",
+          "LCK",
+          "CHA",
+          "INT"
+        ],
+        "traits": []
+      },
+      "ranged": {
+        "stat_priority": [
+          "DEX",
+          "SPD",
+          "LCK",
+          "INT",
+          "CON",
+          "STR",
+          "CHA"
+        ],
+        "traits": []
+      }
+    },
+    "room": "",
+    "search": "",
+    "selected_mode": "best_pairs",
+    "selected_pair_uids": [],
+    "selected_traits": [],
+    "stim": 10,
+    "trait_data": null
+  },
+  "perfect_planner_state": {
+    "actions_table_header_state": "AAAA/wAAAAAAAAABAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAioAAAADAQEBAAAAAAAAAAAAAAAAAGT/////AAAAhAAAAAAAAAADAAABwgAAAAEAAAAAAAAANAAAAAEAAAAAAAAANAAAAAEAAAAAAAAD6AAAAAAAAAAAAAAAAAAAAAAAAAAAAQ==",
+    "avoid_lovers": false,
+    "bottom_splitter_sizes": [
+      318,
+      318
+    ],
+    "has_run": false,
+    "max_risk": "",
+    "min_compat_pct": 15,
+    "min_stats": "",
+    "prefer_high_libido": true,
+    "prefer_low_aggression": true,
+    "splitter_sizes": [
+      132,
+      344
+    ],
+    "starter_pairs": 4,
+    "stimulation": 50,
+    "use_sa": false
+  },
+  "room_optimizer_state": {
+    "avoid_lovers": true,
+    "avoid_trait_loss": false,
+    "bottom_tab_index": 3,
+    "has_run": false,
+    "ignore_stat_priority": false,
+    "max_risk": "",
+    "maximize_throughput": false,
+    "min_stats": "",
+    "minimize_variance": true,
+    "mode_family": false,
+    "prefer_high_libido": true,
+    "prefer_low_aggression": true,
+    "send_kittens_to_fallback": false,
+    "use_sa": false
+  },
+  "room_priority_config": [
+    {
+      "base_stim": 50.0,
+      "max_cats": 6,
+      "room": "Floor1_Large",
+      "type": "best_pairs"
+    },
+    {
+      "base_stim": 50.0,
+      "max_cats": 0,
+      "room": "Attic",
+      "type": "fallback"
+    }
+  ],
+  "room_priority_config_version": 3
+}

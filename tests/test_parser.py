@@ -357,11 +357,7 @@ class TestFurnitureParser:
         assert len(save.unplaced_furniture) == 1
         assert save.unplaced_furniture[0].item_name == 'small_picture_cat'
 
-    def test_parse_furniture_catalog_reads_effects(self):
-        gpak_path = os.path.join('D:\\Games\\Mewgenics', 'resources.gpak')
-        if not os.path.exists(gpak_path):
-            pytest.skip('No game pack available for furniture catalog test')
-
+    def test_parse_furniture_catalog_reads_effects(self, gpak_path):
         game_data = GameData.from_gpak(gpak_path)
         catalog = game_data.furniture_data
 
@@ -372,11 +368,7 @@ class TestFurnitureParser:
         assert catalog['special_fightidol'].effects['Comfort'] == -5
         assert catalog['set_monster_table2'].effects['Evolution'] == 1
 
-    def test_room_summary_applies_overcrowding_to_comfort(self):
-        gpak_path = os.path.join('D:\\Games\\Mewgenics', 'resources.gpak')
-        if not os.path.exists(gpak_path):
-            pytest.skip('No game pack available for room summary test')
-
+    def test_room_summary_applies_overcrowding_to_comfort(self, gpak_path):
         source_path = os.path.join(_proj_root, 'tools', 'saves', '23.sav')
         if not os.path.exists(source_path):
             pytest.skip('No sample save available for furniture summary test')
